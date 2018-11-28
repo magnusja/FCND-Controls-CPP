@@ -97,16 +97,17 @@ VehicleCommand QuadControl::GenerateMotorCommands(float collThrustCmd, V3F momen
   float c_bar = collThrustCmd;
   float p_bar = momentCmd.x / l;
   float q_bar = momentCmd.y / l;
-  float r_bar = momentCmd.z;
+  float r_bar = momentCmd.z / kappa;
 
-  float omega_0 = (c_bar + p_bar + r_bar - q_bar) / (float)4.0;
-  float omega_1 = (c_bar - p_bar + r_bar + q_bar) / (float)4.0;
-  float omega_2 = (c_bar + p_bar - r_bar + q_bar) / (float)4.0;
-  float omega_3 = (c_bar - p_bar - r_bar - q_bar) / (float)4.0;
-  cmd.desiredThrustsN[0] = CONSTRAIN(omega_0, minMotorThrust, maxMotorThrust);
-  cmd.desiredThrustsN[1] = CONSTRAIN(omega_1, minMotorThrust, maxMotorThrust);
-  cmd.desiredThrustsN[2] = CONSTRAIN(omega_2, minMotorThrust, maxMotorThrust);
-  cmd.desiredThrustsN[3] = CONSTRAIN(omega_3, minMotorThrust, maxMotorThrust);
+  float omega_0 = (c_bar + p_bar + q_bar - r_bar) / (float)4.0;
+  float omega_1 = (c_bar - p_bar + q_bar + r_bar) / (float)4.0;
+  float omega_2 = (c_bar + p_bar - q_bar + r_bar) / (float)4.0;
+  float omega_3 = (c_bar - p_bar - q_bar - r_bar) / (float)4.0;
+  // TODO why no CONSTRAIN here?
+  cmd.desiredThrustsN[0] = omega_0;
+  cmd.desiredThrustsN[1] = omega_1;
+  cmd.desiredThrustsN[2] = omega_2;
+  cmd.desiredThrustsN[3] = omega_3;
 
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
@@ -169,8 +170,17 @@ V3F QuadControl::RollPitchControl(V3F accelCmd, Quaternion<float> attitude, floa
 
   float acceleration = collThrustCmd / mass;
 
-  
+  float b_x = R(0, 2);
+  float b_x_err = -accelCmd.x / acceleration - b_x;
+  float b_x_p = kpBank * b_x_err;
 
+
+  float b_y = R(1, 2);
+  float b_y_err = -accelCmd.y / acceleration - b_y;
+  float b_y_p = kpBank * b_y_err;
+
+  pqrCmd.x = R(1, 0) * b_x_p - R(0, 0) * b_y_p / R(2, 2);
+  pqrCmd.y = R(1, 1) * b_x_p - R(0, 1) * b_y_p / R(2, 2);
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 
