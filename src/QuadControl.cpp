@@ -12,6 +12,15 @@
 #include <systemlib/param/param.h>
 #endif
 
+inline V3F constrainVecNormXY(V3F vec, float maximum) {
+    auto mag = vec.magXY();
+    if(mag > maximum) {
+        vec *= maximum / mag;
+    }
+
+    return vec;
+}
+
 void QuadControl::Init()
 {
   BaseController::Init();
@@ -103,7 +112,7 @@ VehicleCommand QuadControl::GenerateMotorCommands(float collThrustCmd, V3F momen
   float omega_1 = (c_bar - p_bar + q_bar + r_bar) / (float)4.0;
   float omega_2 = (c_bar + p_bar - q_bar + r_bar) / (float)4.0;
   float omega_3 = (c_bar - p_bar - q_bar - r_bar) / (float)4.0;
-  // TODO why no CONSTRAIN here?
+
   cmd.desiredThrustsN[0] = omega_0;
   cmd.desiredThrustsN[1] = omega_1;
   cmd.desiredThrustsN[2] = omega_2;
@@ -171,12 +180,12 @@ V3F QuadControl::RollPitchControl(V3F accelCmd, Quaternion<float> attitude, floa
   float acceleration = collThrustCmd / mass;
 
   float b_x = R(0, 2);
-  float b_x_err = -accelCmd.x / acceleration - b_x;
+  float b_x_err = CONSTRAIN(-accelCmd.x / acceleration, -maxTiltAngle, maxTiltAngle) - b_x;
   float b_x_p = kpBank * b_x_err;
 
 
   float b_y = R(1, 2);
-  float b_y_err = -accelCmd.y / acceleration - b_y;
+  float b_y_err = CONSTRAIN(-accelCmd.y / acceleration, -maxTiltAngle, maxTiltAngle) - b_y;
   float b_y_p = kpBank * b_y_err;
 
   pqrCmd.x = R(1, 0) * b_x_p - R(0, 0) * b_y_p / R(2, 2);
@@ -212,7 +221,19 @@ float QuadControl::AltitudeControl(float posZCmd, float velZCmd, float posZ, flo
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
+  auto err = posZCmd - posZ;
+  auto err_dot = velZCmd - velZ;
 
+  integratedAltitudeError += err * dt;
+
+  auto p = kpPosZ * err;
+  auto d = kpVelZ * err_dot;
+
+  auto u1_bar = p + d + accelZCmd + KiPosZ * integratedAltitudeError;
+
+  float net_force = u1_bar - (float) CONST_GRAVITY;
+  float acceleration = CONSTRAIN(net_force / R(2, 2), -maxDescentRate / dt, maxAscentRate / dt);
+  thrust = -mass * acceleration;
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
   
@@ -250,7 +271,8 @@ V3F QuadControl::LateralPositionControl(V3F posCmd, V3F velCmd, V3F pos, V3F vel
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
-  // TODO contrain
+  // only constrain x and y, ignore z
+  velCmd = constrainVecNormXY(velCmd, maxSpeedXY);
 
   auto err = posCmd - pos;
   auto err_dot = velCmd - vel;
@@ -261,6 +283,9 @@ V3F QuadControl::LateralPositionControl(V3F posCmd, V3F velCmd, V3F pos, V3F vel
   accelCmd += p + d;
 
   accelCmd.z = 0;
+
+  // only constrain x and y, ignore z
+  accelCmd = constrainVecNormXY(accelCmd, maxAccelXY);
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 
