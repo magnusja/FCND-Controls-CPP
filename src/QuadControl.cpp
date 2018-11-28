@@ -70,10 +70,44 @@ VehicleCommand QuadControl::GenerateMotorCommands(float collThrustCmd, V3F momen
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
-  cmd.desiredThrustsN[0] = mass * 9.81f / 4.f; // front left
-  cmd.desiredThrustsN[1] = mass * 9.81f / 4.f; // front right
-  cmd.desiredThrustsN[2] = mass * 9.81f / 4.f; // rear left
-  cmd.desiredThrustsN[3] = mass * 9.81f / 4.f; // rear right
+//  cmd.desiredThrustsN[0] = mass * 9.81f / 4.f; // front left
+//  cmd.desiredThrustsN[1] = mass * 9.81f / 4.f; // front right
+//  cmd.desiredThrustsN[2] = mass * 9.81f / 4.f; // rear left
+//  cmd.desiredThrustsN[3] = mass * 9.81f / 4.f; // rear right
+
+  // see set_propeller_angular_velocities in notebook for reference
+
+  // also see https://udacity-flying-car.slack.com/archives/C919QLSGY/p1524949885000076
+  // So we need to redefine the force formulas given in lecture to correspond with these new definitions, as follows:
+  //
+  //F_tot = F0 + F1 + F2 + F3
+  //tau_x = (F0 - F1 + F2 - F3) * l                 // This is Roll
+  //tau_y = (F0 + F1 - F2 - F3) * l                 // This is Pitch
+  //tau_z = (-F0 + F1 + F2 - F3) * kappa      // This is Yaw
+  //
+  //where l = L / sqrt(2)   -  since, unlike in lecture, L is defined as half the distance between rotors
+  //
+  //Now we have 4 equations and 4 unknowns (the F values), so we can solve them to get the F1, F2, F3 and F4 values, given that we already know the F_tot, tau_x, tau_y and tau_z inputs to the GenerateMotorCommands(float collThrustCmd, V3F momentCmd) function. (edited)
+
+  // https://www.wolframalpha.com/input/?i=solve+for+F0,F1,F2,F3++%7B%7B1,1,1,1%7D,%7B1,-1,1,-1%7D,%7B1,1,-1,-1%7D,%7B-1,1,1,-1%7D%7D+*+%7BF0,F1,F2,F3%7D+%3D+%7BA,B,C,D%7D
+
+
+  float l = L / sqrt((float)2.0); // perpendicular distance to axes
+
+  float c_bar = collThrustCmd;
+  float p_bar = momentCmd.x / l;
+  float q_bar = momentCmd.y / l;
+  float r_bar = momentCmd.z;
+
+  float omega_0 = (c_bar + p_bar + r_bar - q_bar) / (float)4.0;
+  float omega_1 = (c_bar - p_bar + r_bar + q_bar) / (float)4.0;
+  float omega_2 = (c_bar + p_bar - r_bar + q_bar) / (float)4.0;
+  float omega_3 = (c_bar - p_bar - r_bar - q_bar) / (float)4.0;
+  cmd.desiredThrustsN[0] = CONSTRAIN(omega_0, minMotorThrust, maxMotorThrust);
+  cmd.desiredThrustsN[1] = CONSTRAIN(omega_1, minMotorThrust, maxMotorThrust);
+  cmd.desiredThrustsN[2] = CONSTRAIN(omega_2, minMotorThrust, maxMotorThrust);
+  cmd.desiredThrustsN[3] = CONSTRAIN(omega_3, minMotorThrust, maxMotorThrust);
+
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 
@@ -98,7 +132,11 @@ V3F QuadControl::BodyRateControl(V3F pqrCmd, V3F pqr)
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
-  
+  V3F inertia = V3F(Ixx, Iyy, Izz);
+
+  V3F err = pqrCmd - pqr;
+
+  momentCmd = kpPQR * err * inertia;
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 
@@ -129,6 +167,9 @@ V3F QuadControl::RollPitchControl(V3F accelCmd, Quaternion<float> attitude, floa
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
+  float acceleration = collThrustCmd / mass;
+
+  
 
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////

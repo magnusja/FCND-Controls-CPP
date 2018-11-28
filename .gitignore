@@ -26,3 +26,6 @@ bld/
 
 # manual cmake build ignores
 build/
+
+cmake-build-debug/
+cmake-build-release/
